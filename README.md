@@ -25,6 +25,7 @@ Changelog
 **v0.01**
 _10:55 AM 12/31/2012_
 Initial commit. Most of the structure is in place, and the body hashes are validating, but I haven't been able to get the signature validation correct just yet. I must have some whitespace issue or some random public key problem.
-TODO: reverse engineer Perl's Mail::DKIM::Verifier package.
-TODO: start on signing code
-TODO: remove debugging output
+
+    TODO: reverse engineer Perl's Mail::DKIM::Verifier package.
+    TODO: start on signing code
+    TODO: remove debugging output
