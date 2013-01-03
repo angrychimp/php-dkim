@@ -22,10 +22,14 @@ Usage
 Changelog
 ---------
 
+**v0.02**
+_5:36 PM 1/2/2013_
+
+* Splitting TODOs into separate file.
+* Finally got the header hash to match my expected value, based on debugging output from Mail::DKIM::Validate.
+* Removed var_dump() calls
+* Still doesn't verify signatures properly - not sure where to go from here.
+
 **v0.01**
 _10:55 AM 12/31/2012_
 Initial commit. Most of the structure is in place, and the body hashes are validating, but I haven't been able to get the signature validation correct just yet. I must have some whitespace issue or some random public key problem.
-
-    TODO: reverse engineer Perl's Mail::DKIM::Verifier package.
-    TODO: start on signing code
-    TODO: remove debugging output
