@@ -28,7 +28,6 @@ class DKIM_Verify extends DKIM {
         // find the present DKIM signatures
         $signatures = $this->_getHeaderFromRaw('DKIM-Signature');
         $signatures = $signatures['DKIM-Signature'];
-        var_dump($signatures);
         
         // Validate the Signature Header Field
         $pubKeys = array();
@@ -128,7 +127,7 @@ class DKIM_Verify extends DKIM {
             foreach ($headerList as $headerName) {
                 $headersToCanonicalize = array_merge($headersToCanonicalize, $this->_getHeaderFromRaw($headerName, 'string'));
             }
-            $headersToCanonicalize[] = 'DKIM-Signature: ' . preg_replace('/b=(.*)$/s', 'b=', $signature);
+            $headersToCanonicalize[] = 'DKIM-Signature: ' . preg_replace('/b=(.*)$/s', 'b=;', $signature);
             
             // get canonicalization algorithm
             list($cHeaderStyle, $cBodyStyle) = explode('/', $dkim['c']);
@@ -187,8 +186,8 @@ class DKIM_Verify extends DKIM {
                 
                 
                 // Compute the Verification
-                $vResult = self::_signatureIsValid($publicKey['p'], $dkim['b'], $hHeaders);
-                var_dump($vResult);
+                $vResult = self::_signatureIsValid($publicKey['p'], $dkim['b'], $hHeaders, $hash);
+                
                 if (!$vResult) {
                     $results[$num][] = array (
                         'status' => 'permfail',
@@ -196,7 +195,8 @@ class DKIM_Verify extends DKIM {
                     );
                 } else {
                     $results[$num][] = array (
-                        
+                        'status' => 'pass',
+                        'reason' => 'Success!',
                     );
                 }
             }
@@ -236,7 +236,7 @@ class DKIM_Verify extends DKIM {
      *
      *
      */
-    protected static function _signatureIsValid($pub, $sig, $str) {
+    protected static function _signatureIsValid($pub, $sig, $str, $hash='sha1') {
         // Convert key back into PEM format
         $key = sprintf("-----BEGIN PUBLIC KEY-----\n%s\n-----END PUBLIC KEY-----", wordwrap($pub, 64, "\n", true));
         
@@ -244,9 +244,11 @@ class DKIM_Verify extends DKIM {
         // http://phpseclib.sourceforge.net
         if (false && class_exists('Crypt_RSA')) {
             $rsa = new Crypt_RSA();
-            $rsa->loadKey(base64_decode($pub));
+            $rsa->setHash($hash);
+            $rsa->loadKey($pub);
             return $rsa->verify(base64_decode($str), base64_decode($sig));
         } else {
+            $pubkeyid = openssl_get_publickey($key);
             return openssl_verify(base64_decode($str), base64_decode($sig), $key);
         }
         
