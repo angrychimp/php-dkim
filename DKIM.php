@@ -11,6 +11,8 @@
  */
 // require_once 'phpseclib/Crypt/Hash.php';
 
+define('PHPSECLIB_USE_EXCEPTIONS', true);
+
 abstract class DKIM {
     
     /**
