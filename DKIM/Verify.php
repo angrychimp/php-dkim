@@ -233,7 +233,7 @@ class DKIM_Verify extends DKIM {
         
         $public = array();
         foreach ($pubDns as $record) {
-            # [DG]: log key may be split to parts
+            # [DG]: long key may be split to parts
            if ( isset($record['entries']) ) $record['txt'] = implode('',$record['entries']);
             $parts = explode(';', trim($record['txt']));
             $record = array();
