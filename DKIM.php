@@ -118,27 +118,30 @@ abstract class DKIM {
             return "\r\n";
         }
         
+        # [DG]: mangle newlines
+        $cBody = str_replace("\r\n","\n",$cBody);
         switch ($style) {
             case 'relaxed':
             default:
                 // http://tools.ietf.org/html/rfc4871#section-3.4.4
                 // strip whitespace off end of lines &
                 // replace whitespace strings with single whitespace
-                $cBody = preg_replace('/[ \\t]+$/m', '', $cBody);
-                $cBody = preg_replace('/[ \\t]+/m', ' ', $cBody);
+                $cBody = preg_replace('/[ \t]+$/m', '', $cBody);
+                $cBody = preg_replace('/[ \t]+/m', ' ', $cBody);
                 
                 // also perform rules for "simple" canonicalization
                 
             case 'simple':
                 // http://tools.ietf.org/html/rfc4871#section-3.4.3
                 // remove any trailing empty lines
-                $cBody = preg_replace('/(\\r\\n)+$/s', '', $cBody);
+                $cBody = preg_replace('/\n+$/s', '', $cBody);
                 break;
         }
+        $cBody = str_replace("\n","\r\n",$cBody);
         
         // Add last trailing CRLF
         $cBody .= "\r\n";
-        
+
         return ($length > 0) ? substr($cBody, 0, $length) : $cBody;
     }
     
@@ -230,7 +233,7 @@ abstract class DKIM {
             return base64_encode($hash->hash($body));
         } else {
             // try standard PHP hash function
-            return base64_encode(pack("H*", hash($method, $body)));
+            return base64_encode(hash($method, $body, true));
         }
         
     }
