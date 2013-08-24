@@ -138,7 +138,8 @@ class DKIM_Verify extends DKIM {
 
             // hash the headers
             $cHeaders = $this->_canonicalizeHeader($headersToCanonicalize, $cHeaderStyle);
-            $hHeaders = self::_hashBody($cHeaders, $hash);
+	    # [DG]: useless
+            # $hHeaders = self::_hashBody($cHeaders, $hash);
             
             // canonicalize body
             $cBody = $this->_canonicalizeBody($cBodyStyle);
