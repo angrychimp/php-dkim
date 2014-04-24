@@ -259,9 +259,10 @@ class DKIM_Verify extends DKIM {
         // prefer Crypt_RSA
         // http://phpseclib.sourceforge.net
         # [DG]: X3 how Crypt_RSA works, skip
-        if (0 && class_exists('Crypt_RSA')) {
+        if (class_exists('Crypt_RSA')) {
             $rsa = new Crypt_RSA();
             $rsa->setHash($hash);
+            $rsa->setSignatureMode(CRYPT_RSA_SIGNATURE_PKCS1);
             $rsa->loadKey($pub);
             return $rsa->verify($str, base64_decode($sig));
         } else {
