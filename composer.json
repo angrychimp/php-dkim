@@ -1,0 +1,18 @@
+{
+    "name": "angrychimp/php-dkim",
+    "description": "Finally, a PHP5 class for not just signing, but _verifying_ DKIM signatures.",
+    "authors": [
+        {
+            "name": "angrychimp",
+            "email": "rk@angrychimp.net"
+        }
+    ],
+    "require": {
+	"phpseclib/phpseclib": ">=0.3.6"
+    },
+    "autoload": {
+	"psr-0": {
+		"DKIM": "./"
+	}
+    }
+}
