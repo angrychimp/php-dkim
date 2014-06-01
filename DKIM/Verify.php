@@ -123,7 +123,7 @@ class DKIM_Verify extends DKIM {
             
             // http://tools.ietf.org/html/rfc4871#section-6.1.3
             // build/canonicalize headers
-            $headerList = explode(':', $dkim['h']);
+            $headerList = array_unique(explode(':', $dkim['h']));
             $headersToCanonicalize = array();
             foreach ($headerList as $headerName) {
                 $headersToCanonicalize = array_merge($headersToCanonicalize, $this->_getHeaderFromRaw($headerName, 'string'));
