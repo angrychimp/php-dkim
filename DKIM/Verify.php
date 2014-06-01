@@ -3,9 +3,7 @@
 /**
  * @see DKIM
  */
-// require_once 'DKIM.php';
-
-
+require_once __DIR__.'/../DKIM.php';
 
 class DKIM_Verify extends DKIM {
     
