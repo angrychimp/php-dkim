@@ -1,6 +1,7 @@
 {
     "name": "angrychimp/php-dkim",
     "description": "Finally, a PHP5 class for not just signing, but _verifying_ DKIM signatures.",
+    "license": "MIT",
     "authors": [
         {
             "name": "angrychimp",
