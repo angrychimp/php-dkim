@@ -162,6 +162,7 @@ class DKIM_Verify extends DKIM {
                         'status' => 'permfail',
                         'reason' => "Public key record does not contain public-key data ({$dkim['d']} key #$knum)",
                     );
+                    continue;
                 } else {
                     // verify that public key data is not empty
                     if (empty($publicKey['p'])) {
@@ -169,6 +170,7 @@ class DKIM_Verify extends DKIM {
                             'status' => 'permfail',
                             'reason' => "Public key record public-key data is emtpy; key may have been revoked ({$dkim['d']} key #$knum)",
                         );
+                        continue;
                     }
                 }
 
