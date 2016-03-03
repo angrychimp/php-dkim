@@ -215,6 +215,10 @@ abstract class DKIM {
                 $on = true;
             }
         }
+
+        // Return last line back to array
+        // (potential off-by-one error with later body hash validation)
+        array_unshift($lines, $line);
         
         return implode("\r\n", $lines);
         
