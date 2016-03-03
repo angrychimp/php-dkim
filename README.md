@@ -22,7 +22,15 @@ Usage
 Changelog
 ---------
 
-**v0.02**
+**v0.2.1**
+_11:28 AM 3/3/2016_
+* Fixed index variable issue (#7)
+* Addressed validation issue when public key record did not have public-key data (#7)
+* Minor version numbering corrections
+* Dropped old copyright info for as-yet-still-empty Sign code
+* Fixed new-line trimming issue (potentially causing verification problems?) (#7)
+
+**v0.2**
 _5:36 PM 1/2/2013_
 
 * Splitting TODOs into separate file.
@@ -30,6 +38,6 @@ _5:36 PM 1/2/2013_
 * Removed var_dump() calls
 * Still doesn't verify signatures properly - not sure where to go from here.
 
-**v0.01**
+**v0.1**
 _10:55 AM 12/31/2012_
 Initial commit. Most of the structure is in place, and the body hashes are validating, but I haven't been able to get the signature validation correct just yet. I must have some whitespace issue or some random public key problem.
