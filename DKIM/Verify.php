@@ -155,6 +155,23 @@ class DKIM_Verify extends DKIM {
             // Iterate over keys
             foreach ($this->_publicKeys[$dkim['d']] as $knum => $publicKey) {
                 // Validate key
+
+                // confirm that required fields are present
+                if (!isset($publicKey['p'])) {
+                    $results[$num][] = array (
+                        'status' => 'permfail',
+                        'reason' => "Public key record does not contain public-key data ({$dkim['d']} key #$knum)",
+                    );
+                } else {
+                    // verify that public key data is not empty
+                    if (empty($publicKey['p'])) {
+                        $results[$num][] = array (
+                            'status' => 'permfail',
+                            'reason' => "Public key record public-key data is emtpy; key may have been revoked ({$dkim['d']} key #$knum)",
+                        );
+                    }
+                }
+
                 // confirm that pubkey version matches sig version (v=)
                 // [DG]: may be missed
                 if (isset($publicKey['v']) && $publicKey['v'] !== 'DKIM' . $dkim['v']) {
