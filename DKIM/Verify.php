@@ -85,7 +85,7 @@ class DKIM_Verify extends DKIM {
             
             // Get the Public Key
             // (note: may retrieve more than one key)
-            # [DG]: yes, the 'q' tag MAY be empty - fallback to default
+            // [DG]: yes, the 'q' tag MAY be empty - fallback to default
             if ( empty($dkim['q']) ) $dkim['q'] = 'dns/txt';
 
             list($qType, $qFormat) = explode('/', $dkim['q']);
@@ -136,8 +136,8 @@ class DKIM_Verify extends DKIM {
 
             // hash the headers
             $cHeaders = $this->_canonicalizeHeader($headersToCanonicalize, $cHeaderStyle);
-	    # [DG]: useless
-            # $hHeaders = self::_hashBody($cHeaders, $hash);
+            // [DG]: useless
+            // $hHeaders = self::_hashBody($cHeaders, $hash);
             
             // canonicalize body
             $cBody = $this->_canonicalizeBody($cBodyStyle);
@@ -156,7 +156,7 @@ class DKIM_Verify extends DKIM {
             foreach ($this->_publicKeys[$dkim['d']] as $num => $publicKey) {
                 // Validate key
                 // confirm that pubkey version matches sig version (v=)
-                # [DG]: may be missed
+                // [DG]: may be missed
                 if (isset($publicKey['v']) && $publicKey['v'] !== 'DKIM' . $dkim['v']) {
                     $results[$num][] = array (
                         'status' => 'permfail',
@@ -188,7 +188,7 @@ class DKIM_Verify extends DKIM {
                 // check testing flag
                 
 
-                # [DG]: is $hash algo available for openssl_verify ?
+                // [DG]: is $hash algo available for openssl_verify ?
                 if ( !class_exists('Crypt_RSA') && !defined('OPENSSL_ALGO_'.strtoupper($hash)) ) {
                     $results[$num][] = array (
                         'status' => 'permfail',
@@ -197,7 +197,7 @@ class DKIM_Verify extends DKIM {
                     continue;
                 }
                 // Compute the Verification
-                # [DG]: verify canonized string, not hash !
+                // [DG]: verify canonized string, not hash !
                 $vResult = self::_signatureIsValid($publicKey['p'], $dkim['b'], $cHeaders, $hash);
                 
                 if (!$vResult) {
@@ -232,8 +232,8 @@ class DKIM_Verify extends DKIM {
         
         $public = array();
         foreach ($pubDns as $record) {
-            # [DG]: long key may be split to parts
-           if ( isset($record['entries']) ) $record['txt'] = implode('',$record['entries']);
+            // [DG]: long key may be split to parts
+            if ( isset($record['entries']) ) $record['txt'] = implode('',$record['entries']);
             $parts = explode(';', trim($record['txt']));
             $record = array();
             foreach ($parts as $part) {
@@ -256,7 +256,7 @@ class DKIM_Verify extends DKIM {
         
         // prefer Crypt_RSA
         // http://phpseclib.sourceforge.net
-        # [DG]: X3 how Crypt_RSA works, skip
+        // [DG]: X3 how Crypt_RSA works, skip
         if (class_exists('Crypt_RSA')) {
             $rsa = new Crypt_RSA();
             $rsa->setHash($hash);
@@ -264,7 +264,7 @@ class DKIM_Verify extends DKIM {
             $rsa->loadKey($pub);
             return $rsa->verify($str, base64_decode($sig));
         } else {
-            #$pubkeyid = openssl_get_publickey($key);
+            // $pubkeyid = openssl_get_publickey($key);
             $signature_alg = constant('OPENSSL_ALGO_'.strtoupper($hash));
             return openssl_verify($str, base64_decode($sig), $key, $signature_alg);
         }

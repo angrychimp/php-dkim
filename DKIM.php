@@ -118,7 +118,7 @@ abstract class DKIM {
             return "\r\n";
         }
         
-        # [DG]: mangle newlines
+        // [DG]: mangle newlines
         $cBody = str_replace("\r\n","\n",$cBody);
         switch ($style) {
             case 'relaxed':
