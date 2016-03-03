@@ -153,14 +153,14 @@ class DKIM_Verify extends DKIM {
             }
 
             // Iterate over keys
-            foreach ($this->_publicKeys[$dkim['d']] as $num => $publicKey) {
+            foreach ($this->_publicKeys[$dkim['d']] as $knum => $publicKey) {
                 // Validate key
                 // confirm that pubkey version matches sig version (v=)
                 // [DG]: may be missed
                 if (isset($publicKey['v']) && $publicKey['v'] !== 'DKIM' . $dkim['v']) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => "Public key version does not match signature version ({$dkim['d']} key #$num)",
+                        'reason' => "Public key version does not match signature version ({$dkim['d']} key #$knum)",
                     );
                 }
                 
@@ -168,7 +168,7 @@ class DKIM_Verify extends DKIM {
                 if (isset($publicKey['h']) && $publicKey['h'] !== $hash) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => "Public key hash algorithm does not match signature hash algorithm ({$dkim['d']} key #$num)",
+                        'reason' => "Public key hash algorithm does not match signature hash algorithm ({$dkim['d']} key #$knum)",
                     );
                 }
                 
@@ -176,7 +176,7 @@ class DKIM_Verify extends DKIM {
                 if (isset($publicKey['k']) && $publicKey['k'] !== $alg) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => "Public key type does not match signature key type ({$dkim['d']} key #$num)",
+                        'reason' => "Public key type does not match signature key type ({$dkim['d']} key #$knum)",
                     );
                 }
                 
@@ -192,7 +192,7 @@ class DKIM_Verify extends DKIM {
                 if ( !class_exists('Crypt_RSA') && !defined('OPENSSL_ALGO_'.strtoupper($hash)) ) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => " Signature Algorithm $hash does not available for openssl_verify(), key #$num)",
+                        'reason' => " Signature Algorithm $hash does not available for openssl_verify(), key #$knum)",
                     );
                     continue;
                 }
@@ -203,7 +203,7 @@ class DKIM_Verify extends DKIM {
                 if (!$vResult) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => "signature did not verify ({$dkim['d']} key #$num)",
+                        'reason' => "signature did not verify ({$dkim['d']} key #$knum)",
                     );
                 } else {
                     $results[$num][] = array (
