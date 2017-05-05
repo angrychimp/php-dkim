@@ -111,13 +111,13 @@ abstract class DKIM {
     protected function _canonicalizeBody($style='simple', $length=-1) {
         
         $cBody = $this->_getBodyFromRaw();
-        
+
         // trim leading whitespace
         
         if ($cBody == '') {
             return "\r\n";
         }
-        
+
         // [DG]: mangle newlines
         $cBody = str_replace("\r\n","\n",$cBody);
         switch ($style) {
@@ -204,23 +204,10 @@ abstract class DKIM {
             return (string)$this->_params['body'];
         }
         
-        $lines = explode("\r\n", $this->_raw);
-        // Jump past all the headers
-        $on = false;
-        while ($line = array_shift($lines)) {
-            if ($on === true && $line != '') {
-                break;
-            }
-            if ($line == '') {
-                $on = true;
-            }
-        }
+        $raw = str_replace("\r\n", "\n", $this->_raw);
+        $body = substr($raw, strpos($raw, "\n\n") + 2);
 
-        // Return last line back to array
-        // (potential off-by-one error with later body hash validation)
-        array_unshift($lines, $line);
-        
-        return implode("\r\n", $lines);
+        return $body;
         
     }
     
