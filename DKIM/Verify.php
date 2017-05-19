@@ -25,6 +25,10 @@ class DKIM_Verify extends DKIM {
 
         // find the present DKIM signatures
         $signatures = $this->_getHeaderFromRaw('DKIM-Signature');
+
+        if(!isset($signatures['DKIM-Signature']))
+            return $results;
+
         $signatures = $signatures['DKIM-Signature'];
 
         // Validate the Signature Header Field
