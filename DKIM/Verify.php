@@ -238,7 +238,7 @@ class DKIM_Verify extends DKIM {
                 if (!$vResult) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => "signature did not verify ({$dkim['d']} key #$knum)",
+                        'reason' => "Signature did not verify ({$dkim['d']} key #$knum)",
                     );
                 } else {
                     $results[$num][] = array (
