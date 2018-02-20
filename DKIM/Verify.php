@@ -156,7 +156,12 @@ class DKIM_Verify extends DKIM {
             // Hash/encode the body
             $bh = self::_hashBody($cBody, $hash);
 
-            if ($bh !== $dkim['bh']) {
+            if ($bh === $dkim['bh']) {
+                $results[$num][] = array (
+                    'status' => 'pass',
+                    'reason' => 'Computed body hash matches signature body hash',
+                );
+            } else {
                 $results[$num][] = array (
                     'status' => 'permfail',
                     'reason' => "Computed body hash does not match signature body hash",
@@ -238,7 +243,7 @@ class DKIM_Verify extends DKIM {
                 } else {
                     $results[$num][] = array (
                         'status' => 'pass',
-                        'reason' => 'Success!',
+                        'reason' => 'Header signature is valid',
                     );
                 }
             }
