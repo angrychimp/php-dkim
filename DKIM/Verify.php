@@ -100,7 +100,14 @@ class DKIM_Verify extends DKIM {
                     switch ($qFormat) {
                         case 'txt':
                             $this->_publicKeys[$dkim['d']] = self::fetchPublicKey($dkim['d'], $dkim['s']);
-
+                            if (!$this->_publicKeys[$dkim['d']]) {
+                                $results[$num][] = array (
+                                    'status' => 'permfail',
+                                    'reason' => 'Public key unavailable (TXT record was not available)',
+                                );
+                                $abort = true;
+                                continue;
+                            }
                             break;
                         default:
                             $results[$num][] = array (
