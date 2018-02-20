@@ -243,7 +243,7 @@ class DKIM_Verify extends DKIM {
                 } else {
                     $results[$num][] = array (
                         'status' => 'pass',
-                        'reason' => 'Header signature is valid',
+                        'reason' => 'Computed header hash matches signature header hash',
                     );
                 }
             }
