@@ -53,7 +53,7 @@ class DKIM_Verify extends DKIM {
                 if (!isset($dkim[$key])) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => "signature missing required tag: $key",
+                        'reason' => "Signature missing required tag: $key",
                     );
                     continue;
                 }
@@ -66,7 +66,7 @@ class DKIM_Verify extends DKIM {
             if ($dkim['v'] != 1) {
                 $results[$num][] = array (
                     'status' => 'permfail',
-                    'reason' => 'incompatible version: ' . $dkim['v'],
+                    'reason' => 'Incompatible version: ' . $dkim['v'],
                 );
                 continue;
             }
@@ -100,7 +100,12 @@ class DKIM_Verify extends DKIM {
                     switch ($qFormat) {
                         case 'txt':
                             $this->_publicKeys[$dkim['d']] = self::fetchPublicKey($dkim['d'], $dkim['s']);
-
+                            if (!$this->_publicKeys[$dkim['d']]) {
+                                $results[$num][] = array (
+                                    'status' => 'permfail',
+                                    'reason' => 'Public key unavailable (TXT record was not available)',
+                                );
+                            }
                             break;
                         default:
                             $results[$num][] = array (
@@ -149,7 +154,12 @@ class DKIM_Verify extends DKIM {
             // Hash/encode the body
             $bh = self::_hashBody($cBody, $hash);
 
-            if ($bh !== $dkim['bh']) {
+            if ($bh === $dkim['bh']) {
+                $results[$num][] = array (
+                    'status' => 'pass',
+                    'reason' => 'Computed body hash matches signature body hash',
+                );
+            } else {
                 $results[$num][] = array (
                     'status' => 'permfail',
                     'reason' => "Computed body hash does not match signature body hash",
@@ -215,7 +225,7 @@ class DKIM_Verify extends DKIM {
                 if ( !class_exists('Crypt_RSA') && !defined('OPENSSL_ALGO_'.strtoupper($hash)) ) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => " Signature Algorithm $hash does not available for openssl_verify(), key #$knum)",
+                        'reason' => "Signature Algorithm $hash does not available for openssl_verify(), key #$knum)",
                     );
                     continue;
                 }
@@ -226,12 +236,12 @@ class DKIM_Verify extends DKIM {
                 if (!$vResult) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => "signature did not verify ({$dkim['d']} key #$knum)",
+                        'reason' => "Signature did not verify ({$dkim['d']} key #$knum)",
                     );
                 } else {
                     $results[$num][] = array (
                         'status' => 'pass',
-                        'reason' => 'Success!',
+                        'reason' => 'Computed header hash matches signature header hash',
                     );
                 }
             }
