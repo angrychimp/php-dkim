@@ -53,7 +53,7 @@ class DKIM_Verify extends DKIM {
                 if (!isset($dkim[$key])) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => "signature missing required tag: $key",
+                        'reason' => "Signature missing required tag: $key",
                     );
                     continue;
                 }
@@ -66,7 +66,7 @@ class DKIM_Verify extends DKIM {
             if ($dkim['v'] != 1) {
                 $results[$num][] = array (
                     'status' => 'permfail',
-                    'reason' => 'incompatible version: ' . $dkim['v'],
+                    'reason' => 'Incompatible version: ' . $dkim['v'],
                 );
                 continue;
             }
@@ -227,7 +227,7 @@ class DKIM_Verify extends DKIM {
                 if ( !class_exists('Crypt_RSA') && !defined('OPENSSL_ALGO_'.strtoupper($hash)) ) {
                     $results[$num][] = array (
                         'status' => 'permfail',
-                        'reason' => " Signature Algorithm $hash does not available for openssl_verify(), key #$knum)",
+                        'reason' => "Signature Algorithm $hash does not available for openssl_verify(), key #$knum)",
                     );
                     continue;
                 }
