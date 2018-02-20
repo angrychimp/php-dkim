@@ -105,8 +105,6 @@ class DKIM_Verify extends DKIM {
                                     'status' => 'permfail',
                                     'reason' => 'Public key unavailable (TXT record was not available)',
                                 );
-                                $abort = true;
-                                continue;
                             }
                             break;
                         default:
