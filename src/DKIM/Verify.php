@@ -1,11 +1,13 @@
 <?php
 
+namespace angrychimp\DKIM;
+
 /**
  * @see DKIM
  */
-require_once __DIR__.'/../DKIM.php';
+require_once __DIR__.'/DKIM.php';
 
-class DKIM_Verify extends DKIM {
+class Verify extends DKIM {
 
     /**
      *
@@ -17,7 +19,7 @@ class DKIM_Verify extends DKIM {
      * Validates all present DKIM signatures
      *
      * @return array
-     * @throws DKIM_Exception
+     * @throws Exception
      */
     public function validate() {
 
@@ -38,12 +40,13 @@ class DKIM_Verify extends DKIM {
             $dkim = preg_replace('/\s+/s', '', $signature);
             $dkim = explode(';', trim($dkim));
             foreach ($dkim as $key => $val) {
-                list($newkey, $newval) = explode('=', trim($val), 2);
+                $tag = explode('=', trim($val), 2);
                 unset($dkim[$key]);
-                if ($newkey == '') {
+                // a segment with no "=" is not a tag; a trailing ";" yields one
+                if (count($tag) < 2 || $tag[0] === '') {
                     continue;
                 }
-                $dkim[$newkey] = $newval;
+                $dkim[$tag[0]] = $tag[1];
             }
 
             // Verify all required values are present
@@ -70,6 +73,21 @@ class DKIM_Verify extends DKIM {
                 );
                 continue;
             }
+            // rsa-sha1 and rsa-sha256 are the only algorithms DKIM defines for
+            // this key type; ed25519-sha256 (RFC 8463) is not supported here.
+            // Without this, an a= naming any other algorithm still reached
+            // openssl_verify() as RSA. Checked before the DNS lookup below so
+            // a bogus a= costs no network traffic.
+            // http://tools.ietf.org/html/rfc4871#section-3.3
+            if (!in_array(strtolower($dkim['a']), array('rsa-sha1', 'rsa-sha256'), true)) {
+                $results[$num][] = array (
+                    'status' => 'permfail',
+                    'reason' => 'Unsupported signature algorithm: ' . $dkim['a'],
+                );
+                continue;
+            }
+            list($alg, $hash) = explode('-', strtolower($dkim['a']));
+
             // todo: other field validations
 
             // d is same or subdomain of i
@@ -81,6 +99,23 @@ class DKIM_Verify extends DKIM {
 
             // if x exists and expired,
             // permfail: signature expired
+            if (isset($dkim['x'])) {
+                // RFC 6376 3.5: x= MUST be greater than t= if both are present
+                if (isset($dkim['t']) && (int)$dkim['x'] <= (int)$dkim['t']) {
+                    $results[$num][] = array (
+                        'status' => 'permfail',
+                        'reason' => 'Signature expiration (x=) not greater than timestamp (t=)',
+                    );
+                    continue;
+                }
+                if ((int)$dkim['x'] < time()) {
+                    $results[$num][] = array (
+                        'status' => 'permfail',
+                        'reason' => 'Signature expired',
+                    );
+                    continue;
+                }
+            }
 
             // check d= against list of configurable unacceptable domains
 
@@ -92,56 +127,53 @@ class DKIM_Verify extends DKIM {
             // [DG]: yes, the 'q' tag MAY be empty - fallback to default
             if ( empty($dkim['q']) ) $dkim['q'] = 'dns/txt';
 
-            list($qType, $qFormat) = explode('/', $dkim['q']);
-            $pubDns = array();
-            $abort = false;
-            switch ($qType) {
-                case 'dns':
-                    switch ($qFormat) {
-                        case 'txt':
-                            $this->_publicKeys[$dkim['d']] = self::fetchPublicKey($dkim['d'], $dkim['s']);
-                            if (!$this->_publicKeys[$dkim['d']]) {
-                                $results[$num][] = array (
-                                    'status' => 'permfail',
-                                    'reason' => 'Public key unavailable (TXT record was not available)',
-                                );
-                            }
-                            break;
-                        default:
-                            $results[$num][] = array (
-                                'status' => 'permfail',
-                                'reason' => 'Public key unavailable (unknown q= query format)',
-                            );
-                            $abort = true;
-                            continue;
-                            break;
-                    }
-                    break;
-                default:
-                    $results[$num][] = array (
-                        'status' => 'permfail',
-                        'reason' => 'Public key unavailable (unknown q= query format)',
-                    );
-                    $abort = true;
-                    continue;
-                    break;
-            }
-            if ($abort === true) {
+            // dns/txt is the only query method DKIM defines, so anything else
+            // (including a q= with no "/") is unusable
+            // http://tools.ietf.org/html/rfc4871#section-3.5
+            if (strtolower($dkim['q']) !== 'dns/txt') {
+                $results[$num][] = array (
+                    'status' => 'permfail',
+                    'reason' => 'Public key unavailable (unknown q= query format)',
+                );
                 continue;
+            }
+
+            $this->_publicKeys[$dkim['d']] = static::fetchPublicKey($dkim['d'], $dkim['s']);
+            if (!$this->_publicKeys[$dkim['d']]) {
+                $results[$num][] = array (
+                    'status' => 'permfail',
+                    'reason' => 'Public key unavailable (TXT record was not available)',
+                );
             }
 
             // http://tools.ietf.org/html/rfc4871#section-6.1.3
             // build/canonicalize headers
-            $headerList = array_unique(explode(':', $dkim['h']));
+            // http://tools.ietf.org/html/rfc4871#section-5.4
+            // a name repeated in h= refers to a further instance of that header
+            // each time, taken from the bottom of the header block upwards
             $headersToCanonicalize = array();
-            foreach ($headerList as $headerName) {
-                $headersToCanonicalize = array_merge($headersToCanonicalize, $this->_getHeaderFromRaw($headerName, 'string'));
+            $instances = array();
+            foreach (explode(':', $dkim['h']) as $headerName) {
+                $headerName = trim($headerName);
+                $key = strtolower($headerName);
+                if (!isset($instances[$key])) {
+                    $instances[$key] = array_reverse($this->_getHeaderFromRaw($headerName, 'string'));
+                }
+                // h= may name a header more often than the message carries it
+                // (or not carry it at all); those contribute nothing to the hash
+                if (!empty($instances[$key])) {
+                    $headersToCanonicalize[] = array_shift($instances[$key]);
+                }
             }
             $headersToCanonicalize[] = 'DKIM-Signature: ' . preg_replace('/([;:]\s*)b=(.*?)(;|$)/s', '${1}b=${3}', $signature);
 
             // get canonicalization algorithm
+            // c= is optional and defaults to simple/simple; a lone algorithm
+            // means the body half is "simple" (RFC 6376 3.5)
+            if ( empty($dkim['c']) ) $dkim['c'] = 'simple/simple';
+            if ( strpos($dkim['c'], '/') === false ) $dkim['c'] .= '/simple';
+
             list($cHeaderStyle, $cBodyStyle) = explode('/', $dkim['c']);
-            list($alg, $hash) = explode('-', $dkim['a']);
 
             // hash the headers
             $cHeaders = $this->_canonicalizeHeader($headersToCanonicalize, $cHeaderStyle);
@@ -164,6 +196,13 @@ class DKIM_Verify extends DKIM {
                     'status' => 'permfail',
                     'reason' => "Computed body hash does not match signature body hash",
                 );
+            }
+
+            // the TXT lookup above may have failed, which was already reported.
+            // The body hash result still stands, but there is no key to check
+            // the signature against
+            if (empty($this->_publicKeys[$dkim['d']])) {
+                continue;
             }
 
             // Iterate over keys
@@ -231,9 +270,11 @@ class DKIM_Verify extends DKIM {
                 }
                 // Compute the Verification
                 // [DG]: verify canonized string, not hash !
-                $vResult = self::_signatureIsValid($publicKey['p'], $dkim['b'], $cHeaders, $hash);
+                $vResult = static::_signatureIsValid($publicKey['p'], $dkim['b'], $cHeaders, $hash);
 
-                if (!$vResult) {
+                // openssl_verify() returns 1, 0 or -1, and -1 (an internal
+                // error) is truthy -- only an explicit 1 counts as a pass
+                if ($vResult !== true && $vResult !== 1) {
                     $results[$num][] = array (
                         'status' => 'permfail',
                         'reason' => "Signature did not verify ({$dkim['d']} key #$knum)",
@@ -267,16 +308,30 @@ class DKIM_Verify extends DKIM {
         foreach ($pubDns as $record) {
             // [DG]: long key may be split to parts
             if ( isset($record['entries']) ) $record['txt'] = implode('',$record['entries']);
-            $parts = explode(';', trim($record['txt']));
-            $record = array();
-            foreach ($parts as $part) {
-                list($key, $val) = explode('=', trim($part), 2);
-                $record[$key] = $val;
-            }
-            $public[] = $record;
+            if ( !isset($record['txt']) ) continue;
+            $public[] = static::_parseKeyRecord($record['txt']);
         }
 
         return $public;
+    }
+
+    /**
+     * Splits a DKIM key TXT record into its tags.
+     *
+     * @param  string $txt
+     * @return array
+     */
+    protected static function _parseKeyRecord($txt) {
+        $record = array();
+        foreach (explode(';', trim($txt)) as $part) {
+            // records commonly end in ";", leaving an empty segment with no "="
+            $tag = explode('=', trim($part), 2);
+            if (count($tag) < 2 || $tag[0] === '') {
+                continue;
+            }
+            $record[$tag[0]] = $tag[1];
+        }
+        return $record;
     }
 
     /**
@@ -291,7 +346,7 @@ class DKIM_Verify extends DKIM {
         // http://phpseclib.sourceforge.net
         // [DG]: X3 how Crypt_RSA works, skip
         if (class_exists('Crypt_RSA')) {
-            $rsa = new Crypt_RSA();
+            $rsa = new \Crypt_RSA();
             $rsa->setHash($hash);
             $rsa->setSignatureMode(CRYPT_RSA_SIGNATURE_PKCS1);
             $rsa->loadKey($pub);

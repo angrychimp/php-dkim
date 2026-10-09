@@ -1,8 +1,9 @@
 {
     "name": "angrychimp/php-dkim",
+    "type": "library",
     "description": "Finally, a PHP5 class for not just signing, but _verifying_ DKIM signatures.",
     "license": "MIT",
-    "version": "0.2.1",
+    "version": "0.4.0",
     "keywords": ["dkim", "signature", "verify"],
     "authors": [
         {
@@ -12,12 +13,15 @@
     ],
     "require": {
         "ext-openssl": "*",
-        "ext-hash": "*",
+        "ext-hash": "*"
+    },
+    "suggest": {
         "phpseclib/phpseclib": ">=0.3.6"
     },
     "autoload": {
-        "psr-0": {
-            "DKIM": "./"
-        }
+        "psr-4": {
+            "angrychimp\\DKIM\\": "src/DKIM/"
+        },
+        "files": ["src/aliases.php"]
     }
 }

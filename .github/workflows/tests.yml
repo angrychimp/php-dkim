@@ -1,0 +1,136 @@
+name: tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  php:
+    name: php ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: openssl, hash
+          # a failed assert() must fail the build, not print and carry on
+          ini-values: zend.assertions=1, assert.exception=1
+          coverage: none
+      - name: lint
+        run: for f in src/*.php src/DKIM/*.php tests/*.php; do php -l "$f" || exit 1; done
+      - name: validate composer.json
+        run: composer validate
+      - name: tests
+        run: for t in tests/*.php; do echo "== $t"; php "$t" || exit 1; done
+
+  # This library agreeing with itself proves very little: the signer and the
+  # verifier share DKIM::_canonicalizeBody(), so a bug there leaves both sides
+  # wrong and still in agreement. Check both directions against dkimpy instead.
+  interop:
+    name: interop with dkimpy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: openssl, hash
+          ini-values: zend.assertions=1, assert.exception=1
+          coverage: none
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install dkimpy cryptography
+
+      - name: php-dkim signs, dkimpy verifies
+        run: |
+          php tests/sign.php --emit "$RUNNER_TEMP/fx"
+          python - <<'PY'
+          import dkim, os, pathlib, sys
+          d = pathlib.Path(os.environ["RUNNER_TEMP"]) / "fx"
+          txt = (d / "pub.txt").read_bytes()
+          bad = []
+          for f in sorted(d.glob("*.eml")):
+              try:
+                  ok = dkim.verify(f.read_bytes(), dnsfunc=lambda n, timeout=5: txt)
+              except Exception as e:
+                  ok = False
+                  print(f"  {f.name}: {type(e).__name__}: {e}")
+              print(("PASS" if ok else "FAIL"), f.name)
+              if not ok:
+                  bad.append(f.name)
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: dkimpy signs, php-dkim verifies
+        run: |
+          python - <<'PY'
+          import dkim, os, pathlib
+          from cryptography.hazmat.primitives.asymmetric import rsa
+          from cryptography.hazmat.primitives import serialization as ser
+          # dkimpy silently produces bad signatures from a PKCS#8 key, so build
+          # a traditional-format one here rather than reusing the PHP export
+          d = pathlib.Path(os.environ["RUNNER_TEMP"]) / "py"
+          d.mkdir(parents=True, exist_ok=True)
+          k = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+          priv = k.private_bytes(ser.Encoding.PEM, ser.PrivateFormat.TraditionalOpenSSL, ser.NoEncryption())
+          pub = k.public_key().public_bytes(ser.Encoding.PEM, ser.PublicFormat.SubjectPublicKeyInfo)
+          p = b"".join(l for l in pub.split(b"\n") if not l.startswith(b"---"))
+          (d / "pub.txt").write_bytes(b"v=DKIM1; k=rsa; p=" + p)
+          cases = {
+            "plain":      (b"From: a@example.com\r\nSubject: s\r\nTo: b@example.net\r\n\r\nbody\r\n", [b"from", b"subject", b"to"]),
+            "folded":     (b"From: a@example.com\r\nSubject: a long one that\r\n\thas been folded\r\n\r\nbody\r\n", [b"from", b"subject"]),
+            "empty-body": (b"From: a@example.com\r\nSubject: s\r\n\r\n", [b"from", b"subject"]),
+            "dup-cc":     (b"From: a@example.com\r\nCc: first@example.net\r\nSubject: d\r\nCc: last@example.net\r\n\r\nbody\r\n", [b"from", b"subject", b"cc", b"cc"]),
+          }
+          n = 0
+          for label, (msg, inc) in cases.items():
+              for ch, cb in [(b"relaxed", b"relaxed"), (b"simple", b"simple")]:
+                  sig = dkim.sign(msg, b"sel", b"example.com", priv, include_headers=inc, canonicalize=(ch, cb))
+                  # only a fixture dkimpy itself accepts is worth handing to php
+                  assert dkim.verify(sig + msg, dnsfunc=lambda x, timeout=5: (d / "pub.txt").read_bytes()), label
+                  (d / f"{n}.eml").write_bytes(sig + msg)
+                  (d / f"{n}.name").write_text(f"{label} [{ch.decode()}/{cb.decode()}]")
+                  n += 1
+          (d / "count").write_text(str(n))
+          PY
+          cat > "$RUNNER_TEMP/verify.php" <<'PHP'
+          <?php
+          require_once getcwd() . '/src/DKIM/Verify.php';
+          $dir = $argv[1];
+          $p = array();
+          foreach (explode(';', file_get_contents("$dir/pub.txt")) as $kv) {
+              list($k, $v) = explode('=', trim($kv), 2);
+              $p[$k] = $v;
+          }
+          class Stub extends \angrychimp\DKIM\Verify {
+              public static $record;
+              public static function fetchPublicKey($domain, $selector) {
+                  return array(self::$record);
+              }
+          }
+          Stub::$record = $p;
+          $bad = 0;
+          $count = (int)file_get_contents("$dir/count");
+          for ($i = 0; $i < $count; $i++) {
+              $v = new Stub(file_get_contents("$dir/$i.eml"));
+              $ok = false; $why = '';
+              foreach ($v->validate() as $res) {
+                  foreach ($res as $r) {
+                      if ($r['reason'] === 'Computed header hash matches signature header hash') $ok = true;
+                      if ($r['status'] === 'permfail') $why .= ' | ' . $r['reason'];
+                  }
+              }
+              $pass = $ok && $why === '';
+              printf("%s %s%s\n", $pass ? 'PASS' : 'FAIL', file_get_contents("$dir/$i.name"), $why);
+              $bad += !$pass;
+          }
+          exit($bad > 0 ? 1 : 0);
+          PHP
+          php "$RUNNER_TEMP/verify.php" "$RUNNER_TEMP/py"
