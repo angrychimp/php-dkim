@@ -1,5 +1,7 @@
 <?php
 
+namespace angrychimp\DKIM;
+
 /**
  * @see phpseclib/Crypt/RSA
  */
@@ -12,6 +14,8 @@
 // require_once 'phpseclib/Crypt/Hash.php';
 
 define('PHPSECLIB_USE_EXCEPTIONS', true);
+
+require_once __DIR__.'/Exception.php';
 
 abstract class DKIM {
     
@@ -38,13 +42,13 @@ abstract class DKIM {
      *
      * @param  string $rawMessage
      * @return DKIM
-     * @throws DKIM_Exception
+     * @throws Exception
      */
     public function __construct($rawMessage='', $params=array()) {
         
         $this->_raw = $rawMessage;
         if (!$this->_raw) {
-            throw new DKIM_Exception('No message content provided');
+            throw new Exception('No message content provided');
         }
         
         $this->_params = $params;
@@ -61,12 +65,12 @@ abstract class DKIM {
      * @param  array $headers
      * @param  string $style
      * @return string
-     * @throws DKIM_Exception
+     * @throws Exception
      */
     protected function _canonicalizeHeader($headers=array(), $style="simple") {
         $headers = (array)$headers;
         if (sizeof($headers) == 0) {
-            throw new DKIM_Exception("Attempted to canonicalize empty header array");
+            throw new Exception("Attempted to canonicalize empty header array");
         }
         
         $cHeader = '';
@@ -79,9 +83,12 @@ abstract class DKIM {
                 
                 $new = array();
                 foreach ($headers as $header) {
-                    // split off header name
-                    list($name, $val) = explode(':', $header, 2);
-                    
+                    // split off header name; a line with no colon is not a
+                    // header field, but drop it and the hash silently changes
+                    $parts = explode(':', $header, 2);
+                    $name = $parts[0];
+                    $val = isset($parts[1]) ? $parts[1] : '';
+
                     // lowercase field name
                     $name = trim(strtolower($name));
                     
@@ -106,17 +113,11 @@ abstract class DKIM {
      * @param  string $style
      * @param  int $length
      * @return string
-     * @throws DKIM_Exception
+     * @throws Exception
      */
     protected function _canonicalizeBody($style='simple', $length=-1) {
         
         $cBody = $this->_getBodyFromRaw();
-
-        // trim leading whitespace
-        
-        if ($cBody == '') {
-            return "\r\n";
-        }
 
         // [DG]: mangle newlines
         $cBody = str_replace("\r\n","\n",$cBody);
@@ -138,9 +139,13 @@ abstract class DKIM {
                 break;
         }
         $cBody = str_replace("\n","\r\n",$cBody);
-        
-        // Add last trailing CRLF
-        $cBody .= "\r\n";
+
+        // "simple" always ends in a single CRLF, even for an empty body, but
+        // "relaxed" canonicalizes an empty body to a null input
+        // http://tools.ietf.org/html/rfc4871#section-3.4.3 and 3.4.4
+        if ($cBody !== '' || $style == 'simple') {
+            $cBody .= "\r\n";
+        }
 
         return ($length > 0) ? substr($cBody, 0, $length) : $cBody;
     }
@@ -180,7 +185,10 @@ abstract class DKIM {
                     $headerVal[] = $line;
                 }
             }
-            if (stripos($line, $headerKey) === 0) {
+            // the colon is required: a bare prefix match pulls in unrelated
+            // headers, e.g. "Message-ID" would also match "Message-ID-Hash".
+            // WSP before the colon is obsolete syntax but still legal
+            if (preg_match('/^'.preg_quote($headerKey, '/').'\s*:/i', $line)) {
                 $on = true;
                 $headerVal[] = $line;
             }
@@ -205,9 +213,12 @@ abstract class DKIM {
         }
         
         $raw = str_replace("\r\n", "\n", $this->_raw);
-        $body = substr($raw, strpos($raw, "\n\n") + 2);
 
-        return $body;
+        // without a blank line there is no body at all; strpos() returning
+        // false here used to read from offset 2, i.e. the middle of a header
+        $split = strpos($raw, "\n\n");
+
+        return $split === false ? '' : substr($raw, $split + 2);
         
     }
     
@@ -220,7 +231,7 @@ abstract class DKIM {
         // prefer to use phpseclib
         // http://phpseclib.sourceforge.net
         if (class_exists('Crypt_Hash')) {
-            $hash = new Crypt_Hash($method);
+            $hash = new \Crypt_Hash($method);
             return base64_encode($hash->hash($body));
         } else {
             // try standard PHP hash function
@@ -229,6 +240,3 @@ abstract class DKIM {
         
     }
 }
-
-
-class DKIM_Exception extends Exception { }
